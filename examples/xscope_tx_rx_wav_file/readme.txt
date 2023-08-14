@@ -1,4 +1,4 @@
-throughput_c_tx_rx_file example
+xscope_tx_rx_wav_file
 ===============================
 This example is for showing the way to read a wav file from xscope and send out the processing result as another wav file through xscope.
 
