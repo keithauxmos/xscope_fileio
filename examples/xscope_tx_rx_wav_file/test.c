@@ -18,7 +18,7 @@
 #define appconfFRAME_ELEMENT_SIZE sizeof(int32_t)
 #define appconfDATA_FRAME_SIZE_BYTES   (appconfFRAME_ADVANCE * appconfOUT_NUM_OF_CHANNELS * appconfFRAME_ELEMENT_SIZE)
 
-//input buffer and output buffer are interleaved as wav file
+//audioprocess_frame function
 void process_frame(void* input_buf, void* output_buf, short num_ch_out, short sampleWidth)
 {
     unsigned i, j;
@@ -26,7 +26,7 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_out, short sa
 
     for(i=0;i<num_ch_out;i++){
         for(j=0;j<appconfFRAME_ADVANCE;j++){
-            //add audio processing here
+            //add your audio processing here
 
             switch(sampleWidth){
                 case 16:
