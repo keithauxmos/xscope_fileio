@@ -5,8 +5,10 @@
 #include <xscope.h>
 #include <xcore/assert.h>
 #include <xcore/hwtimer.h>
+#include <xcore/channel.h>
 #include "xscope_io_device.h"
 #include "wav_utils.h"
+#include "test_process.h"
 
 #include <assert.h>
 
@@ -19,10 +21,30 @@
 #define appconfDATA_FRAME_SIZE_BYTES   (appconfFRAME_ADVANCE * appconfOUT_NUM_OF_CHANNELS * appconfFRAME_ELEMENT_SIZE)
 
 //audioprocess_frame function
-void process_frame(void* input_buf, void* output_buf, short num_ch_out, short sampleWidth)
+void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num_ch_out, short sampleWidth, chanend_t sample_out_c)
 {
     unsigned i, j;
     size_t offset;
+
+    for(i=0;i<num_ch_in;i++){
+        for(j=0;j<appconfFRAME_ADVANCE;j++){
+            switch(sampleWidth){
+                case 16:
+                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
+                    chan_out_word(sample_out_c, *((uint16_t *)(input_buf + offset)));
+                    break;
+                case 24:
+                    offset =  (i * appconfFRAME_ADVANCE + j) * (32/8);
+                    chan_out_word(sample_out_c, *((uint32_t *)(input_buf + offset)));
+                    break;
+                case 32:
+                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
+                    chan_out_word(sample_out_c, *((uint32_t *)(input_buf + offset)));
+                    break;
+            }
+        }
+    }
+
 
     for(i=0;i<num_ch_out;i++){
         for(j=0;j<appconfFRAME_ADVANCE;j++){
@@ -117,6 +139,7 @@ void deinterleaveFrame(const uint8_t* interleavedFrame, void* deinterleavedFrame
                 default:
                     // Unsupported sample width
                     printf("Unsupported sample width: %d\n", sampleWidth);
+                    xassert(0);
                     break;
             }
         }
@@ -152,6 +175,9 @@ void audio_proc_test(void){
 
     printf("Input wav file bit depth : %d\n", input_header_struct.bit_depth);
     printf("Input wav file number of channels : %d\n", input_header_struct.num_channels);
+
+    chan_out_byte(sample_out_c, input_header_struct.bit_depth);
+    chan_out_byte(sample_out_c, input_header_struct.num_channels);
     
     // Calculate number of frames in the wav file
     frame_count = wav_get_num_frames(&input_header_struct);
@@ -176,6 +202,7 @@ void audio_proc_test(void){
         default:
             // Unsupported sample width
             printf("Unsupported sample width: %d!!\n", input_header_struct.bit_depth);
+            xassert(0);
             break;
     }
 
@@ -204,14 +231,14 @@ void audio_proc_test(void){
         switch (input_header_struct.bit_depth) {
             case 16:
                 deinterleaveFrame(p_in_buf, p_audio_in_channels_16, appconfFRAME_ADVANCE,input_header_struct.num_channels, input_header_struct.bit_depth );
-                process_frame(p_audio_in_channels_16, p_audio_out_channels_16, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth);
+                process_frame(p_audio_in_channels_16, p_audio_out_channels_16, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, sample_out_c);
                 interleaveFrame(p_out_buf, p_audio_out_channels_16, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth );
                 break;
             case 24:
             case 32:
                 deinterleaveFrame(p_in_buf, p_audio_in_channels_32, appconfFRAME_ADVANCE,input_header_struct.num_channels, input_header_struct.bit_depth );
-                process_frame(p_audio_in_channels_32, p_audio_out_channels_32, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth);
-                interleaveFrame(p_out_buf, p_audio_out_channels_32, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth );
+                process_frame(p_audio_in_channels_32, p_audio_out_channels_32, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, sample_out_c);
+                interleaveFrame(p_out_buf, p_audio_out_channels_32, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth);
                 break;
         }
 
@@ -221,9 +248,9 @@ void audio_proc_test(void){
     printf("file processing finished!\n");
 }
 
-void main_tile0(chanend_t xscope_chan)
+void main_tile0(chanend_t xscope_chan, chanend_t samples_out_c)
 {
     xscope_io_init(xscope_chan);
-    audio_proc_test();
+    audio_proc_test(samples_out_c);
     xscope_close_all_files();
 }
