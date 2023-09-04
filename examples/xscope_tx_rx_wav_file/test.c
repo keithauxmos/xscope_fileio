@@ -147,7 +147,7 @@ void deinterleaveFrame(const uint8_t* interleavedFrame, void* deinterleavedFrame
 }
 
 
-void audio_proc_test(void){
+void audio_proc_test(chanend_t sample_out_c){
     xscope_file_t infile = xscope_open_file(appconfINPUT_FILENAME, "rb");
     xscope_file_t outfile = xscope_open_file(appconfOUTPUT_FILENAME, "wb");
 
