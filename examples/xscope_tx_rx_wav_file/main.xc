@@ -5,6 +5,10 @@
 
 extern "C" {
 void main_tile0(chanend, chanend, chanend);
+void process_stage_01(chanend, chanend);
+void process_stage_02(chanend, chanend);
+void process_stage_11(chanend, chanend);
+void process_stage_12(chanend, chanend);
 }
 
 // void main_tile0(chanend xscope_chan, chanend samples_out_c);
@@ -22,12 +26,14 @@ int main (void)
     on tile[0]: {
       par{
         main_tile0(xscope_chan,c01,c0_out_to_xtag);
-        process_stage_01(c01,c11);
+        process_stage_01(c01,c02);
+        process_stage_02(c02,c11);
       }
     }
     on tile[1]: {
       par{
-        process_stage_11(c11,c0_out_to_xtag);
+        process_stage_11(c11,c12);
+        process_stage_12(c12,c0_out_to_xtag);
       }
     }
   }

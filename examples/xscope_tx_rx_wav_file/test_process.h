@@ -13,8 +13,6 @@ extern uint8_t read_input_header_rdy;
 
 void get_input_wav_details();
 
-void process_stage_01(chanend_t input_c, chanend_t output_c);
-void process_stage_11(chanend_t input_c, chanend_t output_c);
 
 #define appconfOUT_NUM_OF_CHANNELS 2
 #define appconfFRAME_ADVANCE 240
