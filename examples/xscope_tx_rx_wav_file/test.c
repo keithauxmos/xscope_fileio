@@ -15,10 +15,7 @@
 #define appconfINPUT_FILENAME    "testin_ch6_32bit.wav"
 #define appconfOUTPUT_FILENAME   "testout.wav"
 
-#define appconfOUT_NUM_OF_CHANNELS 2
-#define appconfFRAME_ADVANCE 240
-#define appconfFRAME_ELEMENT_SIZE sizeof(int32_t)
-#define appconfDATA_FRAME_SIZE_BYTES   (appconfFRAME_ADVANCE * appconfOUT_NUM_OF_CHANNELS * appconfFRAME_ELEMENT_SIZE)
+
 
 //audioprocess_frame function
 void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num_ch_out, short sampleWidth, chanend_t samples_to_proc_c, chanend_t sample_after_proc_c)
@@ -27,7 +24,7 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
     size_t offset;
 
     uint16_t * buf_processed_16;
-    uint32_t * buf_processed_32;
+    void * buf_processed;
     uint16_t byte_per_block;
 
     for(i=0;i<num_ch_in;i++){
@@ -35,7 +32,8 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
             switch(sampleWidth){
                 case 16:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    chan_out_word(samples_to_proc_c, *((uint16_t *)(input_buf + offset)));
+                    chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset)))>>8 | 0xFF);
+                    chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset))) | 0xFF);
                     break;
                 case 24:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (32/8);
@@ -57,12 +55,12 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
         case 24:
         case 32:
             byte_per_block = appconfFRAME_ADVANCE * num_ch_in * sizeof(uint32_t);
-            buf_processed_32=(uint32_t *)malloc(byte_per_block);
+            buf_processed = malloc(byte_per_block);
             for(i=0;i<num_ch_in;i++){
-                 for(j=0;j<appconfFRAME_ADVANCE;j++){
-                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    *((uint32_t *)(buf_processed_32 + offset))=chan_in_word(sample_after_proc_c);
-                 }
+                for(j=0;j<appconfFRAME_ADVANCE;j++){
+                    offset =  (i * appconfFRAME_ADVANCE + j) * sizeof(uint32_t);
+                    *((uint32_t *)(buf_processed + offset))=chan_in_word(sample_after_proc_c);
+                }
             }
             break;
     }
@@ -78,19 +76,23 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
                     *((uint16_t *)(output_buf + offset))=*((uint16_t *)(input_buf + offset));
                     break;
                 case 24:
-                    offset =  (i * appconfFRAME_ADVANCE + j) * (32/8);
-                    *((uint32_t *)(output_buf + offset))=*((uint32_t *)(input_buf + offset));
-                    break;
                 case 32:
-                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    *((uint32_t *)(output_buf + offset))=*((uint32_t *)(buf_processed_32 + offset));
+                    offset =  (i * appconfFRAME_ADVANCE + j) * sizeof(uint32_t);
+                    *((uint32_t *)(output_buf + offset))=*((uint32_t *)(buf_processed + offset));
                     break;
             }
         }
     }
-
-    free(buf_processed_16);
-    free(buf_processed_32);
+    switch(sampleWidth){
+        case 16:
+            free(buf_processed_16);
+            break;
+        case 24:
+        case 32:
+            free(buf_processed);
+            // free(buf_processed_32);
+            break;
+    }
 }
 
 //interleaveFrame for sending back to xscope output
@@ -183,10 +185,8 @@ void audio_proc_test(chanend_t samples_to_proc_c, chanend_t sample_after_proc_c)
     size_t bytes_read = 0;
 
     uint8_t * p_in_buf;
-    uint16_t * p_audio_in_channels_16;     //audio buffer of one block with samples arranged as channels, for sample width of 16bit
-    uint32_t * p_audio_in_channels_32;     //audio buffer of one block with samples arranged as channels, for sample width of 24 or 32bit
-    uint16_t * p_audio_out_channels_16;     //audio buffer of one block of processed output samples, for sample width of 16bit
-    uint32_t * p_audio_out_channels_32;     //audio buffer of one block of processed output samples, for sample width of 24 or 32bit
+    void * p_audio_in_channels;   //audio buffer of one block with samples arranged as channels
+    void * p_audio_out_channels;  //audio buffer of one block of processed output samples
     uint8_t * p_out_buf;
     size_t out_buf_size;
 
@@ -215,13 +215,13 @@ void audio_proc_test(chanend_t samples_to_proc_c, chanend_t sample_after_proc_c)
 
     switch (input_header_struct.bit_depth) {
         case 16:
-            p_audio_in_channels_16 = (uint16_t * )malloc(appconfFRAME_ADVANCE * sizeof(uint16_t) * input_header_struct.num_channels);
-            p_audio_out_channels_16 = (uint16_t * )malloc(appconfFRAME_ADVANCE * sizeof(uint16_t) * appconfOUT_NUM_OF_CHANNELS);
+            p_audio_in_channels = malloc(appconfFRAME_ADVANCE * sizeof(uint16_t) * input_header_struct.num_channels);
+            p_audio_out_channels = malloc(appconfFRAME_ADVANCE * sizeof(uint16_t) * appconfOUT_NUM_OF_CHANNELS);
             break;
         case 24:
         case 32:
-            p_audio_in_channels_32 = (uint32_t * )malloc(appconfFRAME_ADVANCE * sizeof(uint32_t) * input_header_struct.num_channels);
-            p_audio_out_channels_32 = (uint32_t * )malloc(appconfFRAME_ADVANCE * sizeof(uint32_t) * appconfOUT_NUM_OF_CHANNELS);
+            p_audio_in_channels = malloc(appconfFRAME_ADVANCE * sizeof(uint32_t) * input_header_struct.num_channels);
+            p_audio_out_channels = malloc(appconfFRAME_ADVANCE * sizeof(uint32_t) * appconfOUT_NUM_OF_CHANNELS);
             break;
         default:
             // Unsupported sample width
@@ -252,19 +252,10 @@ void audio_proc_test(chanend_t samples_to_proc_c, chanend_t sample_after_proc_c)
         bytes_read = xscope_fread(&infile, p_in_buf, bytes_per_block);
         memset(p_in_buf + bytes_read, 0x00, bytes_per_block - bytes_read);   //fill in buffer with zeros if data read is smaller than one frame data size.
 
-        switch (input_header_struct.bit_depth) {
-            case 16:
-                deinterleaveFrame(p_in_buf, p_audio_in_channels_16, appconfFRAME_ADVANCE,input_header_struct.num_channels, input_header_struct.bit_depth );
-                process_frame(p_audio_in_channels_16, p_audio_out_channels_16, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, samples_to_proc_c, sample_after_proc_c);
-                interleaveFrame(p_out_buf, p_audio_out_channels_16, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth );
-                break;
-            case 24:
-            case 32:
-                deinterleaveFrame(p_in_buf, p_audio_in_channels_32, appconfFRAME_ADVANCE,input_header_struct.num_channels, input_header_struct.bit_depth );
-                process_frame(p_audio_in_channels_32, p_audio_out_channels_32, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, samples_to_proc_c,sample_after_proc_c);
-                interleaveFrame(p_out_buf, p_audio_out_channels_32, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth);
-                break;
-        }
+
+        deinterleaveFrame(p_in_buf, p_audio_in_channels, appconfFRAME_ADVANCE,input_header_struct.num_channels, input_header_struct.bit_depth );
+        process_frame(p_audio_in_channels, p_audio_out_channels, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, samples_to_proc_c, sample_after_proc_c);
+        interleaveFrame(p_out_buf, p_audio_out_channels, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth );
 
         xscope_fwrite(&outfile, p_out_buf, out_buf_size);
     }

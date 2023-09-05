@@ -19,7 +19,7 @@
 void process_stage_01(chanend_t input_c, chanend_t output_c)
 {
     uint32_t i;
-    uint32_t* stage01_buffer_32;
+    void* stage01_buffer;
 
     uint8_t first_block=1;
     uint8_t bit_depth, num_chan;
@@ -35,12 +35,14 @@ void process_stage_01(chanend_t input_c, chanend_t output_c)
     printf("process_stage_01, %d bit %d-ch\n",bit_depth,num_chan);
 
     switch (bit_depth){
+        case 16:
+            break;
         case 24:
         case 32:
-            stage01_buffer_32 = (uint32_t*)malloc(samples_per_block * sizeof(uint32_t));
+            stage01_buffer = malloc(samples_per_block * sizeof(uint32_t));
             break;
     }
-    printf("got malloc process_stage_01, add:%d\n",stage01_buffer_32);
+    printf("got malloc process_stage_01, add:%d\n",stage01_buffer);
 
 
     while(1) {        
@@ -48,7 +50,7 @@ void process_stage_01(chanend_t input_c, chanend_t output_c)
             case 24:
             case 32:
                 for(i=0;i<samples_per_block;i++){
-                    stage01_buffer_32[i]=chan_in_word(input_c);
+                    *((uint32_t *)(stage01_buffer+i*sizeof(uint32_t)))=chan_in_word(input_c);
                 }
                 break;
         }
@@ -65,7 +67,7 @@ void process_stage_01(chanend_t input_c, chanend_t output_c)
             case 24:
             case 32:
                 for(i=0;i<samples_per_block;i++){
-                    chan_out_word(output_c,stage01_buffer_32[i]);
+                    chan_out_word(output_c,*((uint32_t *)(stage01_buffer+i*sizeof(uint32_t))));
                     // printf("got ch %lu\n",stage01_buffer_32[i]);
                 }
                 break;
