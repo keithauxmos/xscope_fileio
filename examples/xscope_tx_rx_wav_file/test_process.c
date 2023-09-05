@@ -13,14 +13,6 @@
 
 #include <assert.h>
 
-#define appconfINPUT_FILENAME    "testin_ch6_32bit.wav"
-#define appconfOUTPUT_FILENAME   "testout.wav"
-
-#define appconfOUT_NUM_OF_CHANNELS 2
-#define appconfFRAME_ADVANCE 240
-#define appconfFRAME_ELEMENT_SIZE sizeof(int32_t)
-#define appconfDATA_FRAME_SIZE_BYTES   (appconfFRAME_ADVANCE * appconfOUT_NUM_OF_CHANNELS * appconfFRAME_ELEMENT_SIZE)
-
 #define SAMPLES_PER_BLOCK   (appconfFRAME_ADVANCE * input_header_struct.num_channels)
 
 //audioprocess_frame function
