@@ -12,7 +12,7 @@
 
 #include <assert.h>
 
-#define appconfINPUT_FILENAME    "testin_ch6_32bit.wav"
+#define appconfINPUT_FILENAME    "testin_ch6_16bit.wav"
 #define appconfOUTPUT_FILENAME   "testout.wav"
 
 
@@ -23,8 +23,9 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
     unsigned i, j;
     size_t offset;
 
-    uint16_t * buf_processed_16;
     void * buf_processed;
+    uint8_t temp_byte_buf[2];   //temp buffer for receiving 16-bit samples
+
     uint16_t byte_per_block;
 
     for(i=0;i<num_ch_in;i++){
@@ -32,8 +33,8 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
             switch(sampleWidth){
                 case 16:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset)))>>8 | 0xFF);
-                    chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset))) | 0xFF);
+                    chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset)))>>8 & 0xFF);
+                    chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset))) & 0xFF);
                     break;
                 case 24:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (32/8);
@@ -50,7 +51,15 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
     switch(sampleWidth){
         case 16:
             byte_per_block = appconfFRAME_ADVANCE * num_ch_in * sizeof(uint16_t);
-            buf_processed_16=(uint16_t *)malloc(byte_per_block);
+            buf_processed=malloc(byte_per_block);
+            for(i=0;i<num_ch_in;i++){
+                for(j=0;j<appconfFRAME_ADVANCE;j++){
+                    temp_byte_buf[0]=chan_in_byte(sample_after_proc_c);
+                    temp_byte_buf[1]=chan_in_byte(sample_after_proc_c);
+                    offset =  (i * appconfFRAME_ADVANCE + j) * sizeof(uint16_t);
+                    *(uint16_t *)(buf_processed+offset)=temp_byte_buf[0]<<8 | temp_byte_buf[1];
+                }
+            }
             break;
         case 24:
         case 32:
@@ -68,12 +77,11 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
 
     for(i=0;i<num_ch_out;i++){
         for(j=0;j<appconfFRAME_ADVANCE;j++){
-            //add your audio processing here
 
             switch(sampleWidth){
                 case 16:
-                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    *((uint16_t *)(output_buf + offset))=*((uint16_t *)(input_buf + offset));
+                    offset =  (i * appconfFRAME_ADVANCE + j) * sizeof(uint16_t);
+                    *((uint16_t *)(output_buf + offset))=*((uint16_t *)(buf_processed + offset));
                     break;
                 case 24:
                 case 32:
@@ -83,16 +91,7 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
             }
         }
     }
-    switch(sampleWidth){
-        case 16:
-            free(buf_processed_16);
-            break;
-        case 24:
-        case 32:
-            free(buf_processed);
-            // free(buf_processed_32);
-            break;
-    }
+    free(buf_processed);
 }
 
 //interleaveFrame for sending back to xscope output
