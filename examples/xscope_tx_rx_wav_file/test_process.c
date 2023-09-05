@@ -124,16 +124,14 @@ void process_stage_11(chanend_t input_c, chanend_t output_c)
 
         // bit_depth=chan_out_byte(output_c, bit_depth);
         // num_chan=chan_out_byte(output_c, num_chan);
-        // switch (bit_depth){
-        //     case 24:
-        //     case 32:
-                
-        //         for(i=0;i<samples_per_block;i++){
-        //             chan_out_word(output_c,stage1_buffer_32[i]);
-        //             // printf("got ch %lu\n",stage1_buffer_32[i]);
-        //         }
-        //         break;
-        // }
+        switch (bit_depth){
+            case 24:
+            case 32:
+                for(i=0;i<samples_per_block;i++){
+                    chan_out_word(output_c,stage11_buffer_32[i]);
+                }
+                break;
+        }
         
     }
 }

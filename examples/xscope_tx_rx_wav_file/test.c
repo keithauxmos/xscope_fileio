@@ -21,28 +21,50 @@
 #define appconfDATA_FRAME_SIZE_BYTES   (appconfFRAME_ADVANCE * appconfOUT_NUM_OF_CHANNELS * appconfFRAME_ELEMENT_SIZE)
 
 //audioprocess_frame function
-void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num_ch_out, short sampleWidth, chanend_t sample_out_c)
+void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num_ch_out, short sampleWidth, chanend_t samples_to_proc_c, chanend_t sample_after_proc_c)
 {
     unsigned i, j;
     size_t offset;
+
+    uint16_t * buf_processed_16;
+    uint32_t * buf_processed_32;
+    uint16_t byte_per_block;
 
     for(i=0;i<num_ch_in;i++){
         for(j=0;j<appconfFRAME_ADVANCE;j++){
             switch(sampleWidth){
                 case 16:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    chan_out_word(sample_out_c, *((uint16_t *)(input_buf + offset)));
+                    chan_out_word(samples_to_proc_c, *((uint16_t *)(input_buf + offset)));
                     break;
                 case 24:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (32/8);
-                    chan_out_word(sample_out_c, *((uint32_t *)(input_buf + offset)));
+                    chan_out_word(samples_to_proc_c, *((uint32_t *)(input_buf + offset)));
                     break;
                 case 32:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    chan_out_word(sample_out_c, *((uint32_t *)(input_buf + offset)));
+                    chan_out_word(samples_to_proc_c, *((uint32_t *)(input_buf + offset)));
                     break;
             }
         }
+    }
+
+    switch(sampleWidth){
+        case 16:
+            byte_per_block = appconfFRAME_ADVANCE * num_ch_in * sizeof(uint16_t);
+            buf_processed_16=(uint16_t *)malloc(byte_per_block);
+            break;
+        case 24:
+        case 32:
+            byte_per_block = appconfFRAME_ADVANCE * num_ch_in * sizeof(uint32_t);
+            buf_processed_32=(uint32_t *)malloc(byte_per_block);
+            for(i=0;i<num_ch_in;i++){
+                 for(j=0;j<appconfFRAME_ADVANCE;j++){
+                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
+                    *((uint32_t *)(buf_processed_32 + offset))=chan_in_word(sample_after_proc_c);
+                 }
+            }
+            break;
     }
 
 
@@ -61,12 +83,14 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
                     break;
                 case 32:
                     offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
-                    *((uint32_t *)(output_buf + offset))=*((uint32_t *)(input_buf + offset));
+                    *((uint32_t *)(output_buf + offset))=*((uint32_t *)(buf_processed_32 + offset));
                     break;
             }
         }
     }
 
+    free(buf_processed_16);
+    free(buf_processed_32);
 }
 
 //interleaveFrame for sending back to xscope output
@@ -147,7 +171,7 @@ void deinterleaveFrame(const uint8_t* interleavedFrame, void* deinterleavedFrame
 }
 
 
-void audio_proc_test(chanend_t sample_out_c){
+void audio_proc_test(chanend_t samples_to_proc_c, chanend_t sample_after_proc_c){
     xscope_file_t infile = xscope_open_file(appconfINPUT_FILENAME, "rb");
     xscope_file_t outfile = xscope_open_file(appconfOUTPUT_FILENAME, "wb");
 
@@ -176,8 +200,8 @@ void audio_proc_test(chanend_t sample_out_c){
     printf("Input wav file bit depth : %d\n", input_header_struct.bit_depth);
     printf("Input wav file number of channels : %d\n", input_header_struct.num_channels);
 
-    chan_out_byte(sample_out_c, input_header_struct.bit_depth);
-    chan_out_byte(sample_out_c, input_header_struct.num_channels);
+    chan_out_byte(samples_to_proc_c, input_header_struct.bit_depth);
+    chan_out_byte(samples_to_proc_c, input_header_struct.num_channels);
     
     // Calculate number of frames in the wav file
     frame_count = wav_get_num_frames(&input_header_struct);
@@ -231,13 +255,13 @@ void audio_proc_test(chanend_t sample_out_c){
         switch (input_header_struct.bit_depth) {
             case 16:
                 deinterleaveFrame(p_in_buf, p_audio_in_channels_16, appconfFRAME_ADVANCE,input_header_struct.num_channels, input_header_struct.bit_depth );
-                process_frame(p_audio_in_channels_16, p_audio_out_channels_16, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, sample_out_c);
+                process_frame(p_audio_in_channels_16, p_audio_out_channels_16, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, samples_to_proc_c, sample_after_proc_c);
                 interleaveFrame(p_out_buf, p_audio_out_channels_16, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth );
                 break;
             case 24:
             case 32:
                 deinterleaveFrame(p_in_buf, p_audio_in_channels_32, appconfFRAME_ADVANCE,input_header_struct.num_channels, input_header_struct.bit_depth );
-                process_frame(p_audio_in_channels_32, p_audio_out_channels_32, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, sample_out_c);
+                process_frame(p_audio_in_channels_32, p_audio_out_channels_32, input_header_struct.num_channels, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth, samples_to_proc_c,sample_after_proc_c);
                 interleaveFrame(p_out_buf, p_audio_out_channels_32, appconfFRAME_ADVANCE, appconfOUT_NUM_OF_CHANNELS, input_header_struct.bit_depth);
                 break;
         }
@@ -246,11 +270,12 @@ void audio_proc_test(chanend_t sample_out_c){
     }
 
     printf("file processing finished!\n");
+    _Exit(1);
 }
 
-void main_tile0(chanend_t xscope_chan, chanend_t samples_out_c)
+void main_tile0(chanend_t xscope_chan, chanend_t samples_to_proc_c, chanend_t sample_after_proc_c)
 {
     xscope_io_init(xscope_chan);
-    audio_proc_test(samples_out_c);
+    audio_proc_test(samples_to_proc_c, sample_after_proc_c);
     xscope_close_all_files();
 }
