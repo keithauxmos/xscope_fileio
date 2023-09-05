@@ -12,7 +12,7 @@
 
 #include <assert.h>
 
-#define appconfINPUT_FILENAME    "testin_ch6_16bit.wav"
+#define appconfINPUT_FILENAME    "testin_ch6_32bit.wav"
 #define appconfOUTPUT_FILENAME   "testout.wav"
 
 
@@ -28,26 +28,28 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
 
     uint16_t byte_per_block;
 
+
+    //sent out samples to pipeline tasks for processing
     for(i=0;i<num_ch_in;i++){
         for(j=0;j<appconfFRAME_ADVANCE;j++){
             switch(sampleWidth){
                 case 16:
-                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
+                    offset =  (i * appconfFRAME_ADVANCE + j) * sizeof(uint16_t);
                     chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset)))>>8 & 0xFF);
                     chan_out_byte(samples_to_proc_c, (*((uint16_t *)(input_buf + offset))) & 0xFF);
                     break;
                 case 24:
-                    offset =  (i * appconfFRAME_ADVANCE + j) * (32/8);
-                    chan_out_word(samples_to_proc_c, *((uint32_t *)(input_buf + offset)));
-                    break;
                 case 32:
-                    offset =  (i * appconfFRAME_ADVANCE + j) * (sampleWidth/8);
+                    offset =  (i * appconfFRAME_ADVANCE + j) * sizeof(uint32_t);
                     chan_out_word(samples_to_proc_c, *((uint32_t *)(input_buf + offset)));
                     break;
             }
         }
     }
 
+    //get back samples from the last pipeline tasks
+    //data is stored in buf_processed
+    //buf_process is a samples with the same number of channels as the input file, i.e. if the input is 6-ch, buf_process is still 6-ch
     switch(sampleWidth){
         case 16:
             byte_per_block = appconfFRAME_ADVANCE * num_ch_in * sizeof(uint16_t);
@@ -74,7 +76,7 @@ void process_frame(void* input_buf, void* output_buf, short num_ch_in, short num
             break;
     }
 
-
+    //output back to XTAG is 2-ch only, therefore, here only the first two channels in buf_processed are copied to output_buf
     for(i=0;i<num_ch_out;i++){
         for(j=0;j<appconfFRAME_ADVANCE;j++){
 
@@ -113,18 +115,18 @@ void interleaveFrame(uint8_t* interleavedFrame, void* deinterleavedFrames, unsig
             // Convert the processed audio buffer back to interleaved samples for sending back to xscope
             switch (sampleWidth) {
                 case 16:
-                    temp_interleaved_sample_16 = *((uint16_t*)(deinterleavedFrames + (j * appconfFRAME_ADVANCE + i)*bytesPerSample));
+                    temp_interleaved_sample_16 = *((uint16_t*)(deinterleavedFrames + (j * appconfFRAME_ADVANCE + i)*sizeof(uint16_t)));
                     *samplePtr = temp_interleaved_sample_16 & 0xFF;
                     *(samplePtr+1) = (temp_interleaved_sample_16 >> 8) & 0xFF;
                     break;
                 case 24:
-                    temp_interleaved_sample_32 = *((uint32_t*)(deinterleavedFrames + (j * appconfFRAME_ADVANCE + i)*(32/8)));
+                    temp_interleaved_sample_32 = *((uint32_t*)(deinterleavedFrames + (j * appconfFRAME_ADVANCE + i)*sizeof(uint32_t)));
                     *samplePtr = temp_interleaved_sample_32 & 0xFF;
                     *(samplePtr+1) = (temp_interleaved_sample_32 >> 8) & 0xFF;
                     *(samplePtr+2) = (temp_interleaved_sample_32 >> 16) & 0xFF;
                     break;
                 case 32:
-                    temp_interleaved_sample_32 = *((uint32_t*)(deinterleavedFrames + (j * appconfFRAME_ADVANCE + i)*bytesPerSample));
+                    temp_interleaved_sample_32 = *((uint32_t*)(deinterleavedFrames + (j * appconfFRAME_ADVANCE + i)*sizeof(uint32_t)));
                     *samplePtr = temp_interleaved_sample_32 & 0xFF;
                     *(samplePtr+1) = (temp_interleaved_sample_32 >> 8) & 0xFF;
                     *(samplePtr+2) = (temp_interleaved_sample_32 >> 16) & 0xFF;
